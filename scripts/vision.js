@@ -20,7 +20,7 @@ const SKILL_DIR = path.resolve(__dirname, "..");
 const CONFIG_FILE = path.join(SKILL_DIR, "config.json");
 const CACHE_FILE = path.join(SKILL_DIR, "cache.json");
 const CACHE_MAX = 50;
-const DEF_CFG = { base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1", api_key: "", model: "qwen3.5-omni-plus" };
+const DEF_CFG = { base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1", api_key: "", model: "qwen3.5-omni-plus", language: "zh" };
 const EXTS = { jpg: "jpeg", jpeg: "jpeg", png: "png", gif: "gif", webp: "webp", bmp: "bmp" };
 const MAX_SIZE = 20 * 1024 * 1024;
 
@@ -65,14 +65,15 @@ async function setup() {
   const apiKey = await q(`API Key (当前: ${cur.api_key ? "****" + cur.api_key.slice(-4) : "未设置"}): `);
   const baseUrl = await q(`API 地址 (回车保持 ${cur.base_url}): `) || cur.base_url;
   const model = await q(`模型 (回车保持 ${cur.model}): `) || cur.model;
-  saveConfig({ base_url: baseUrl.trim(), api_key: apiKey.trim() || cur.api_key, model: model.trim() });
+  const lang = (await q(`语言 Language (zh/en, 回车保持 ${cur.language || "zh"}): `) || cur.language || "zh").toLowerCase();
+  saveConfig({ base_url: baseUrl.trim(), api_key: apiKey.trim() || cur.api_key, model: model.trim(), language: lang });
   console.log("\n✅ 配置完成！\n配置已保存到: " + CONFIG_FILE + "\n");
   rl.close();
 }
 
 function showConfig() {
   const c = loadConfig();
-  console.log(`\n📋 当前配置\n  API 地址: ${c.base_url}\n  模型名称: ${c.model}\n  API Key: ${c.api_key ? "****" + c.api_key.slice(-4) : "❌ 未设置"}\n  配置文件: ${CONFIG_FILE}\n`);
+  console.log(`\n📋 当前配置\n  API 地址: ${c.base_url}\n  模型名称: ${c.model}\n  API Key: ${c.api_key ? "****" + c.api_key.slice(-4) : "❌ 未设置"}\n  语言: ${c.language === "en" ? "English" : "中文"}\n  配置文件: ${CONFIG_FILE}\n`);
   if (!c.api_key) console.log("  💡 运行 node vision.js --setup 配置 API Key\n");
 }
 
@@ -115,7 +116,11 @@ function parseArgs() {
     promptParts.push(a);
   }
 
-  return { action: "run", images, prompt: promptParts.join(" ") || "请详细描述这些图片的内容。", useCache };
+  const cfg = loadConfig();
+  const defaultPrompt = cfg.language === "en"
+    ? "Describe this image in detail in English, including composition, colors, text, people, objects, scene, and any other notable elements."
+    : "用中文详细描述这张图片的所有内容，包括构图、颜色、文字、人物、场景等所有细节。";
+  return { action: "run", images, prompt: promptParts.join(" ") || defaultPrompt, useCache };
 }
 
 // ── Image Processing ──
