@@ -5,7 +5,7 @@
 ## 一键安装
 
 ```bash
-npx skills add guorui999/claude-vision-skill
+npx skills add guorui999/vision
 ```
 
 ## 配置
