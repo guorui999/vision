@@ -55,8 +55,8 @@ function loadConfig() {
   if (fs.existsSync(path.join(SKILL_DIR, ".env"))) {
     try { require("dotenv").config({ path: path.join(SKILL_DIR, ".env") }); } catch { /* dotenv not installed, skip .env loading */ }
   }
-  if (process.env.DASHSCOPE_API_KEY) return { base_url: process.env.DASHSCOPE_BASE_URL || DEF_CFG.base_url, api_key: process.env.DASHSCOPE_API_KEY, model: process.env.VISION_MODEL || DEF_CFG.model };
-  return DEF_CFG;
+  if (process.env.DASHSCOPE_API_KEY) return { base_url: process.env.DASHSCOPE_BASE_URL || DEF_CFG.base_url, api_key: process.env.DASHSCOPE_API_KEY, model: process.env.VISION_MODEL || DEF_CFG.model, language: process.env.VISION_LANGUAGE || DEF_CFG.language };
+  return { ...DEF_CFG };
 }
 function saveConfig(c) { fs.writeFileSync(CONFIG_FILE, JSON.stringify(c, null, 2), "utf-8"); }
 
@@ -126,8 +126,8 @@ function parseArgs() {
       inPrompt = true; promptParts.push(a); continue;
     }
 
-    if (a.startsWith("http") && /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(a)) {
-      images.push({ source: a, isUrl: true }); continue;
+    if (a.startsWith("http")) {
+      try { const u = new URL(a); if (/\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(u.pathname)) { images.push({ source: a, isUrl: true }); continue; } } catch {}
     }
 
     inPrompt = true;
@@ -184,14 +184,14 @@ async function request(baseUrl, apiKey, payload, retries = 2) {
             try { resolve(JSON.parse(data)?.choices?.[0]?.message?.content || data); } catch { resolve(data); }
           });
         });
-        req.on("error", reject);
+        req.on("error", err => reject(new Error(`NET:${err.code || err.message}`)));
         req.write(body);
         req.end();
       });
     } catch (err) {
-      if (i < retries && (err.message.startsWith("HTTP 429") || err.message.startsWith("HTTP 5"))) {
+      if (i < retries && (err.message.startsWith("HTTP 429") || err.message.startsWith("HTTP 5") || err.message.startsWith("NET:"))) {
         const d = (i + 1) * 1000;
-        process.stderr.write(`\n⏳ API 限流/错误，${d / 1000}s 后重试 (${i + 1}/${retries})...\n`);
+        process.stderr.write(`\n⏳ 请求错误，${d / 1000}s 后重试 (${i + 1}/${retries})...\n`);
         await new Promise(r => setTimeout(r, d));
         continue;
       }
